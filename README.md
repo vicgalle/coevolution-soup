@@ -1,6 +1,6 @@
 # Replicating "Co-evolution of self-replication and function in a digital primordial soup"
 
-Replication of the main experiment from Cicala et al. (arXiv:2607.09211): a
+Replication of the main experiment from Cicala et al. ([arXiv:2607.09211](https://arxiv.org/abs/2607.09211)): a
 primordial soup of random **Z80 assembly** programs in which self-replication
 must emerge spontaneously from random bytes, and task-solving (evaluating
 polynomials) co-evolves under a competence-gated interaction rule.
@@ -153,7 +153,7 @@ ready, exactly the metabolic-efficiency behaviour the paper reports.
 
 ![Reduced-scale dynamics (one 128×128 niche unless noted). (A) Spontaneous self-replication across 3 seeds, with the phase transition at stochastically varying epochs and the signature metric overcounting relative to the recursive true-replicator test. (B) Competence-gating fixes seeded task-solvers at ~98%. (C) Tape entropy climbs (heat-death pressure) then collapses as replicators fill memory. (D) Metabolic execution length shortens as early-halting solvers dominate.](results/fig_final.png)
 
-## Honest deviations / scope
+## Scope
 - **Scale.** Full de novo co-emergence of *both* replication and task-solving is
   reproduced at the paper's grid size (2¹⁹ programs, 32 niches, CNP) in a 100k-epoch
   run (§0). The paper runs 10⁶ epochs × 100 seeds; here a single 100k-epoch seed
