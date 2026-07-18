@@ -1,0 +1,16 @@
+# compiled binaries / objects
+build/
+*.o
+*.out
+a.out
+
+# large, regenerable population dumps (16 MB+ each)
+results/*.bin
+
+# run logs and scratch CSVs (figures + curated CSVs are kept)
+results/*.log
+/tmp/
+
+# OS / editor cruft
+.DS_Store
+*.swp
