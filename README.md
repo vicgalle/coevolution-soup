@@ -120,13 +120,37 @@ itself reproduce. This rejects the trivial all-NOP zero tape that byte-signature
 would miss. The same emergence occurs at the **full 2¹⁹-program 32-niche grid**
 (`trepl`→0.70 by epoch 400, all niches).
 
-### 2. The evolved replicator is the paper's Load-Push (Fig 2A)
-Disassembling the evolved population shows the dominant replicator is
+### 2. Replicator architecture turns over: Load-Push → LDIR (Fig 2)
+The dominant replicator *architecture changes over time*, exactly as the paper
+reports (Fig 2D). Byte-signature counts on the evolved populations:
+
+| run | LDIR-family | Load-Push |
+|-----|:-----------:|:---------:|
+| early / short single niche (≤12k epochs) | 0% | ~83% |
+| full 32-niche grid after 100k epochs (§0) | **99.3%** | 0.03% |
+
+**Load-Push appears first.** In short runs the dominant replicator is
 `LD BC,$01C5 ; PUSH BC ; …` repeated — the exact Load-Push mechanism the paper
-reports as *first to appear*: load two program bytes into a register, push them
-onto the stack (which grows down into the partner's half), copying the program.
-LDIR replicators (which "take over later" in the paper, over 10⁴–10⁵ epochs) are
-absent at these epoch counts — consistent with the paper's turnover ordering.
+calls *first to appear*: load two program bytes into a register, push them onto
+the stack (which grows down into the partner's half), copying the program. It
+uses the **entire 32-byte tape**.
+
+**LDIR takes over once function co-evolves.** In the 100k full-grid run — where
+task-solving emerged — Load-Push is essentially gone and 99.3% of tapes carry an
+LDIR-family copy loop. Every dominant genotype is a **bounded LDIR replicator with
+task code appended**, e.g. the disassembled winner from niche 0 (task `n`):
+```
+LD E,$20 ; LD C,E ; LDIR ; … compute … ; LD E,<result> ; HALT
+```
+`LD E,$20` points the copy at byte 32 (the partner half), `LD C,E` sets the count
+to 32, `LDIR` copies the 32-byte tape — precisely the LDIR replicator of Fig 2B
+(`HL=0, DE=32, BC=32`). The decisive point is that this whole copy machine is only
+~6 bytes, so **the rest of the tape is free for the polynomial-solving code**.
+A Load-Push replicator consumes the *whole* tape and leaves no room to also
+compute `f(x)`; so once solving became advantageous (the `p_succ` gate), the
+compact LDIR architecture that can do *both* out-competed it. This is the paper's
+"pressure to solve tasks reshapes the reproductive machinery": function does not
+just ride on top of replication — it changes *which* replicator wins.
 
 ![Spatial structure of the soup (paper Fig 1E analogue), each program coloured by its prolog bytes. Top: initial random bytes — rainbow speckle. Bottom: after 6000 epochs — Load-Push replicator lineages (prolog `01 C5` → green) dominate every niche, with black patches (low-complexity tapes) and coloured speckle (mutants).](results/fig_grid.png)
 
