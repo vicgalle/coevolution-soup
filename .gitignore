@@ -14,3 +14,7 @@ results/*.log
 # OS / editor cruft
 .DS_Store
 *.swp
+
+# animation frame scratch
+results/*.anim
+__pycache__/

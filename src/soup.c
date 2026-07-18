@@ -48,6 +48,8 @@ typedef struct {
     int   plant_solver; // plant this many solver+replicator genotypes (2n+1 + bounded LDIR)
     int   plant_dud;    // plant this many matched NON-solving replicators (same LDIR copy)
     int   notasks;      // 1 = skip validation, always interact (Fig 2D control)
+    int   anim;         // if >0, emit an animation frame every `anim` epochs (denser early)
+    const char* animout;// animation frame file
     const char* out_csv;
     const char* dump;   // optional: write final population (NPROG*32 bytes) here
 } Params;
@@ -204,6 +206,20 @@ static int solves_all(z80_t* cpu, const uint8_t* prog, int task){
     return 1;
 }
 
+// Animation status of a program in its niche: 2=solves its task, 1=replicator,
+// 0=other. Uses the fast core directly (reentrant). Solver check short-circuits.
+static uint8_t anim_status(const uint8_t* prog, int task){
+    uint8_t m[SB_MEM], e; int h;
+    int sv=1;
+    for(int n=0;n<16;n++){ memcpy(m,prog,32); memset(m+32,0,32);
+        zf_run(m,(uint8_t)n,P.budget,&e,&h); if(e!=poly_eval(task,n)){ sv=0; break; } }
+    if(sv) return 2;
+    memcpy(m,prog,32); for(int i=0;i<32;i++) m[32+i]=(uint8_t)(0x5A^(i*13));
+    zf_run(m,0,P.budget,&e,&h);
+    int f=0,r=0; for(int i=0;i<32;i++){ if(m[32+i]==prog[i])f++; if(m[32+i]==prog[31-i])r++; }
+    return ((f>r?f:r)>=28) ? 1 : 0;
+}
+
 // ------------------------------- main loop ----------------------------------
 int main(int argc, char** argv){
     // defaults
@@ -211,7 +227,7 @@ int main(int argc, char** argv){
     P.p_base=0.3; P.p_succ=1.0; P.C=0.3; P.pi=0.05;
     P.mut_inv=64; P.budget=512; P.seed=1; P.log_every=100;
     P.single_task=10 /* 2n+1 */; P.plant=0; P.plant_solver=0; P.plant_dud=0;
-    P.notasks=0; P.out_csv="results/run.csv"; P.dump=NULL;
+    P.notasks=0; P.anim=0; P.animout=NULL; P.out_csv="results/run.csv"; P.dump=NULL;
     for(int i=1;i<argc;i++){
         if(!strcmp(argv[i],"--niches")) P.L=atoi(argv[++i]);
         else if(!strcmp(argv[i],"--w")) P.W=atoi(argv[++i]);
@@ -226,6 +242,8 @@ int main(int argc, char** argv){
         else if(!strcmp(argv[i],"--plant_dud")) P.plant_dud=atoi(argv[++i]);
         else if(!strcmp(argv[i],"--notasks")) P.notasks=1;
         else if(!strcmp(argv[i],"--dump")) P.dump=argv[++i];
+        else if(!strcmp(argv[i],"--anim")) P.anim=atoi(argv[++i]);
+        else if(!strcmp(argv[i],"--animout")) P.animout=argv[++i];
         else if(!strcmp(argv[i],"--log")) P.log_every=atol(argv[++i]);
         else if(!strcmp(argv[i],"--out")) P.out_csv=argv[++i];
         else if(!strcmp(argv[i],"--budget")) P.budget=atoi(argv[++i]);
@@ -284,6 +302,15 @@ int main(int argc, char** argv){
             1
 #endif
     );
+
+    // animation frame output: header [magic,W,H,L] then per-frame [epoch, NPROG*4 bytes]
+    FILE* animf = NULL; uint8_t* framebuf = NULL;
+    if (P.anim>0 && P.animout){
+        animf = fopen(P.animout,"wb");
+        int32_t hdr[4] = { 0x4D494E41 /*'ANIM'*/, P.W, P.H, P.L };
+        fwrite(hdr,4,4,animf);
+        framebuf = malloc((size_t)NPROG*4);
+    }
 
     struct timespec t0; clock_gettime(CLOCK_MONOTONIC,&t0);
 
@@ -421,8 +448,25 @@ int main(int argc, char** argv){
                 (double)solve/SAMPLE, niches_solved, P.L, avg_steps, zero_frac, secs);
             fflush(stderr);
         }
+        // ---- animation frame (denser during early emergence) ----
+        if (animf){
+            int due = (epoch<3000) ? (epoch%200==0) : (epoch%P.anim==0);
+            if (due){
+                #pragma omp parallel for schedule(dynamic,512)
+                for(int i=0;i<NPROG;i++){
+                    const uint8_t* t=tape(i);
+                    framebuf[i*4+0]=t[0]; framebuf[i*4+1]=t[1]; framebuf[i*4+2]=t[2];
+                    framebuf[i*4+3]=anim_status(t, task_of(i));
+                }
+                int32_t ep=(int32_t)epoch;
+                fwrite(&ep,4,1,animf); fwrite(framebuf,1,(size_t)NPROG*4,animf); fflush(animf);
+            }
+        }
+
         (void)val_ct;(void)inter_ct;
     }
+    if (animf){ fclose(animf); free(framebuf);
+        fprintf(stderr,"# wrote animation frames to %s\n", P.animout); }
     fclose(csv);
     if (P.dump){
         FILE* df = fopen(P.dump,"wb");

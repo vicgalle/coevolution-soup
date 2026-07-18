@@ -1,5 +1,11 @@
 # Replicating "Co-evolution of self-replication and function in a digital primordial soup"
 
+<p align="center">
+  <img src="results/hero.gif" alt="Evolution of the 32-niche Z80 soup over 100,000 epochs" width="100%">
+</p>
+
+<p align="center"><em>The full 32-niche, 2<sup>19</sup>-program grid evolving over 100,000 epochs (niches tiled in task-difficulty order). Random primordial noise → self-replicators (blue) sweep every niche → task-solvers (green) emerge de novo around epoch 50k and spread across 27/32 niches in two curriculum waves; the 5 hardest (cubic-polynomial) niches, bottom-right, keep replicating but never crack the task.</em></p>
+
 Replication of the main experiment from Cicala et al. ([arXiv:2607.09211](https://arxiv.org/abs/2607.09211)): a
 primordial soup of random **Z80 assembly** programs in which self-replication
 must emerge spontaneously from random bytes, and task-solving (evaluating
