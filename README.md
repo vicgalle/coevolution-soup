@@ -4,233 +4,133 @@
   <img src="results/hero.gif" alt="Evolution of the 32-niche Z80 soup over 100,000 epochs" width="100%">
 </p>
 
-<p align="center"><em>The full 32-niche, 2<sup>19</sup>-program grid evolving over 100,000 epochs (niches tiled in task-difficulty order). Random primordial noise → self-replicators (blue) sweep every niche → task-solvers (green) emerge de novo around epoch 50k and spread across 27/32 niches in two curriculum waves; the 5 hardest (cubic-polynomial) niches, bottom-right, keep replicating but never crack the task.</em></p>
+<p align="center"><em>The full grid of 32 niches (2<sup>19</sup> programs) over 100,000 epochs, with niches tiled in order of increasing task difficulty. The soup starts as random noise; self-replicators (blue) then spread through every niche; and task-solvers (green) appear spontaneously around epoch 50,000 and propagate across 27 of the 32 niches. The five hardest niches, whose targets are cubic polynomials (bottom-right), keep replicating but never solve their task.</em></p>
 
-Replication of the main experiment from Cicala et al. ([arXiv:2607.09211](https://arxiv.org/abs/2607.09211)): a
-primordial soup of random **Z80 assembly** programs in which self-replication
-must emerge spontaneously from random bytes, and task-solving (evaluating
-polynomials) co-evolves under a competence-gated interaction rule.
+This repository reproduces the main experiment of Cicala et al. ([arXiv:2607.09211](https://arxiv.org/abs/2607.09211)): a primordial soup of random Z80 assembly programs in which self-replication is not built in but must emerge from random bytes, while the ability to solve a task (evaluating a polynomial) co-evolves under a competence-gated interaction rule. The code, the figures below, and the animation above can all be regenerated from scratch with the commands at the end.
 
-## What the paper does (main experiment, §2.2 / Fig 1E)
+## The model
 
-- Population of 32-byte Z80 programs on a grid, divided into 32 niches; each
-  niche has a target polynomial `f(x)`.
-- Each epoch (Algorithm 1): mutate each program w.p. 1/64; pair each available
-  program with an available von Neumann neighbour (w.p. `π=0.05` a random global
-  partner = cross-niche pollination); **validate** P1 on its polynomial (3
-  sampled inputs); execute `concat(P1,P2)` with probability `p_succ=1.0` if
-  validated else `p_base=0.3` (validated prob discounted by a metabolic penalty
-  `C·k/B`); split the 64-byte result back into the two cells.
-- **Replication is never built in.** It only happens when executed code copies
-  one program's bytes over the other's memory. Programs that both copy
-  themselves *and* solve their task are selected fastest.
+Following the paper (Section 2.2, Fig. 1E), the population consists of 32-byte Z80 programs arranged on a grid divided into 32 niches, each niche assigned a target polynomial `f(x)`. Every epoch applies Algorithm 1. Each program is mutated with probability 1/64. Each still-available program is then paired with an available von Neumann neighbour, except that with probability `π = 0.05` the partner is drawn from the whole population instead, which the paper calls cross-niche pollination. The first program of the pair is validated on its polynomial for three sampled inputs, and the concatenation `concat(P1, P2)` is executed with probability `p_succ = 1.0` if the program validated and `p_base = 0.3` otherwise, the validated probability being discounted by a metabolic penalty `C·k/B`. The resulting 64-byte tape is split back into the two cells.
 
-## This repository
+Reproduction is never issued as a command. It happens only when the executed code copies one program's bytes over the other's memory, so a program that both copies itself and solves its task is the one selected most often. The point of the experiment is that neither ability is provided in advance; both have to be discovered by the population.
+
+## Repository
 
 | file | purpose |
 |------|---------|
-| `src/z80.h` | floooh/chips cycle-accurate Z80 (reference emulator, MIT/zlib) |
+| `src/z80.h` | floooh/chips cycle-accurate Z80, used as the reference emulator (MIT/zlib) |
+| `src/z80fast.h` | fast instruction-stepped Z80 core (differential-tested against chips) |
 | `src/sandbox.h` | 64-byte execution sandbox matching Methods 4.1 |
-| `src/soup.c` | Algorithm 1 + all measurement, OpenMP-parallel |
-| `src/analyze.c` | verifies dumped populations for **genuine** replication |
-| `src/disasm.h` | compact Z80 disassembler (reads evolved replicators) |
-| `src/z80fast.h` | fast instruction-stepped Z80 core (differential-tested) |
-| `src/difftest.c` | 3M-tape differential test: `z80fast.h` vs chips (100% match) |
-| `plot_final.py` | the main results figure (`results/fig_final.png`) |
+| `src/soup.c` | Algorithm 1 and all measurement, parallelised with OpenMP |
+| `src/analyze.c` | verifies a dumped population for genuine replication |
+| `src/grid_analyze.c` | per-niche solve rates for the 32-niche grid |
+| `src/disasm.h` | small Z80 disassembler, used to read evolved replicators |
+| `src/difftest.c` | differential test of `z80fast.h` against chips over 3M tapes |
+| `plot_final.py`, `viz_grid.py`, `make_gif.py` | figures and the animation |
 
-### The Z80 sandbox (Methods 4.1)
-Two 32-byte programs are concatenated into a **64-byte** memory; every address
-is taken `mod 64`. Execution starts at `PC=0` for at most `B=512` instructions.
-Register init: `A=SP=0xFF`, `HL=BC=E=0`, `D=x` (validation input) or `0`
-(interaction), everything else 0. Output is register `E` (result `mod 2^8`).
-Stops at `HALT` or the instruction budget. `IN` returns open-bus `0xFF`.
+### The Z80 sandbox
 
-Validated on the paper's known replicators: the **LDIR** seed `1E 20 ED B0`
-produces an exact 32-byte self-copy; the **Load-Push** seed fills the partner
-half; hand-written `2n+1` and `n^2` programs compute correctly.
+Two 32-byte programs are concatenated into a 64-byte memory, and every address is taken modulo 64. Execution begins at `PC = 0` and runs for at most `B = 512` instructions. Registers are initialised with `A = SP = 0xFF`, `HL = BC = E = 0`, `D` set to the task input `x` during validation or to `0` during interaction, and everything else zero; the output is read from register `E`, modulo 2^8. Execution stops at a `HALT` or when the budget is exhausted, and `IN` returns an open-bus `0xFF`. I checked the sandbox against the replicators the paper describes: the `LDIR` seed `1E 20 ED B0` produces an exact 32-byte self-copy, the Load-Push seed fills the partner half, and hand-written `2n+1` and `n^2` programs compute the right values.
 
-### Algorithm 1 (`soup.c`)
-Faithful to the pseudocode. Key engineering for speed (see below): the
-**sequential** pairing step (shuffle + greedy availability marking, ~0.78 of the
-grid selected) produces a list of *disjoint* (P1,P2) pairs; the **expensive Z80
-executions run in an OpenMP parallel-for** over that list, each pair driven by a
-deterministic per-pair RNG. Mutation is seeded per-index. Result: the simulation
-is **bit-for-bit reproducible regardless of core count** (verified: 2-thread and
-8-thread outputs identical).
+### Algorithm 1
 
-## Parameters (paper Table 1)
-`ℓ=32`, `B=512`, `p_base=0.3`, `p_succ=1.0`, `π=0.05`, mutation `1/64`,
-validation = 3 inputs (no replacement) from `{0..15}`, output `mod 2^8`,
-`C=0.3`. The full 32-niche grid is `512×1024=2^19` programs; here a single niche
-is `128×128` (one paper niche) unless noted.
+The implementation follows the pseudocode closely. For performance (see below), the pairing step, which is sequential and cheap, is separated from the executions, which are expensive: it emits a list of disjoint `(P1, P2)` pairs, and the executions then run in an OpenMP parallel loop over that list. Each pair draws from a deterministic per-pair RNG and mutation is seeded per program index, so the whole simulation is reproducible bit for bit regardless of the number of threads (I verified that two- and eight-thread runs produce identical output).
 
-## Speed (the load-bearing engineering)
-Random programs run ~461 of 512 steps (only ~11% halt), so Z80 execution
-dominates cost. Four levers:
-- **Validation short-circuit**: a non-validating P1 (≈every program early on)
-  fails input #1 and skips runs 2–3 — ~1 execution/pair instead of 3.
-- **Decoupled parallel execution**: the cheap sequential pairing emits *disjoint*
-  (P1,P2) pairs; the expensive executions run in an OpenMP `parallel for` over
-  them → near-linear scaling to 8 cores.
-- **`z80fast.h`** — a from-scratch **instruction-stepped** Z80 replacing the
-  cycle-accurate chips core. It is **differential-tested against chips over 3,000,000
-  random tapes with 100.0000% exact agreement** on final 64-byte memory, output
-  `E`, step count, and halt flag (zero opcode approximations; full CB/ED/DD/FD/
-  DDCB/FDCB coverage, undocumented flag bits included). Standalone: **6.15×**
-  (39 → 240 M inst/s single-thread); **in the full soup: 7.13×** (2000 single-niche
-  epochs: 37.3 s → 5.2 s). The two soup builds produce **byte-identical** CSVs.
-- Net: one `128×128` epoch ≈ **2 ms**; the **full 32-niche 2¹⁹-program grid ≈
-  67 ms/epoch** on 8 cores — the paper's grid size, tractable on a laptop.
+## Parameters
 
-Build the fast soup by default; `-DUSE_CHIPS` selects the reference core. Verify
-the core yourself: `clang -O3 -march=native -o build/difftest src/difftest.c && ./build/difftest`.
+The defaults follow the paper's Table 1: program length 32 bytes, instruction budget `B = 512`, `p_base = 0.3`, `p_succ = 1.0`, `π = 0.05`, mutation rate 1/64, validation on three inputs drawn without replacement from `{0,…,15}`, output modulo 2^8, and metabolic coefficient `C = 0.3`. The full grid is `512 × 1024 = 2^19` programs across 32 niches; a single niche is `128 × 128`, the same size as one niche in the paper.
+
+## Performance
+
+Almost all of the cost is Z80 execution, because random programs rarely halt (about 11% do) and the rest run the full 512-instruction budget. Three choices keep the simulation fast enough to run the paper's grid on a laptop.
+
+First, validation short-circuits: a program that already fails the first sampled input is not run on the other two, which for the mostly non-validating early population means about one execution per pair rather than three.
+
+Second, as noted above, the executions are parallelised over disjoint pairs and scale nearly linearly to eight cores.
+
+Third, and most importantly, the cycle-accurate chips core is replaced by `z80fast.h`, a hand-written instruction-stepped core. I checked it against chips on three million random tapes and found exact agreement on the final 64-byte memory, the output register, the step count, and the halt flag, with no opcode approximations and full coverage of the CB/ED/DD/FD prefix pages, undocumented flag bits included. It is 6.1 times faster in isolation (39 to 240 million instructions per second on one thread) and 7.1 times faster inside the soup, and the two builds produce byte-identical CSVs. With it, a `128 × 128` niche runs at roughly 2 ms per epoch and the full `2^19`-program grid at roughly 67 ms per epoch. The fast core is the default; `-DUSE_CHIPS` selects the reference core, and the differential test can be run with `clang -O3 -march=native -o build/difftest src/difftest.c && ./build/difftest`.
 
 ## Results
 
-### 0. Full de novo co-emergence at paper scale (headline)
-A single 100,000-epoch run of the **full 32-niche 2¹⁹-program grid** (~2 h on 8
-cores, seed 1) reproduces the paper's central result — *both* self-replication
-and task-solving emerging from random bytes:
-- Replicators sweep every niche by ~epoch 500. Task-solving stays at the noise
-  floor until **~epoch 50,000**, when a working solver spontaneously assembles,
-  then spreads: **niches solved 0 → 18 (linear+quadratic) → 27/32**, `solve_frac`
-  → 0.75, in two distinct waves — the emergent-curriculum signature (Fig 5),
-  cross-niche pollination carrying solutions between niches.
-- **All 18 linear and all 9 quadratic tasks solve; all 5 cubic (n³) tasks
-  resist** — exactly the paper's difficulty ordering (cubics need more compute /
-  a deeper curriculum). The evolved winners both solve and copy (`true_repl`→0.85),
-  and `avg_steps` drops ~500 → 66 as early-halting solvers dominate.
-- An evolved de novo solver+replicator for niche 0 (task `n`), disassembled,
-  interleaves junk with a functional core `… LD B,D … LDIR … LD E,B ; HALT` —
-  it copies its 32 bytes and returns `E=D`. Real evolved code, not the hand-built
-  genotype of §3.
+### Co-emergence at the paper's scale
 
-This is the combined emergence I had expected to require the paper's cluster
-compute; it turns out ~2 h at full grid size on a laptop is enough to catch it
-(the 7× fast core is what makes that feasible).
+A single run of the full 32-niche grid (`2^19` programs) for 100,000 epochs, from one random seed, reproduces the paper's main result: self-replication and task-solving both emerge from random bytes. Replicators spread through every niche within the first few hundred epochs. Task-solving then stays at the noise floor until about epoch 50,000, when a working solver assembles by chance in one niche; solutions propagate from there, and the number of solved niches rises from 0 to 18 (the linear and quadratic tasks) and, after a plateau, to 27 of 32. This staged spread across niches is the emergent curriculum the paper describes (Fig. 5), with cross-niche pollination carrying solutions between niches. All 18 linear and all 9 quadratic tasks are solved and none of the 5 cubic tasks is, which matches the difficulty ordering the paper reports. The genotypes that come to dominate both solve and copy themselves (true-replicator fraction about 0.85), and the mean execution length falls from about 500 to 66 steps as early-halting solvers take over. The run takes about two hours on eight cores, which is what the fast core makes feasible.
 
-![De novo co-emergence on the full 32-niche 2¹⁹-program grid. Left: replicators sweep early, then task-solving assembles around epoch 50,000 and rises to solve_frac≈0.75. Right: niches solved jumps 0→18 (linear+quadratic), plateaus, then a second wave to 27/32 — the emergent curriculum spreading solutions between niches; the 5 cubic tasks resist.](results/fig_grid1e5.png)
+![Full 32-niche grid over 100,000 epochs. Left: replicators spread early, then task-solving appears around epoch 50,000 and rises to a solve fraction near 0.75. Right: the number of solved niches rises from 0 to 18, plateaus, and then reaches 27 of 32 in a second wave, as solutions spread between niches.](results/fig_grid1e5.png)
 
-### 1. Self-replication emerges de novo (verified)
-From random bytes, a sharp phase transition: replicators appear and sweep the
-grid. Across 3 seeds the transition occurs at stochastically varying epochs
-(~150 to ~2500 at `128×128`), true-replicator fraction spiking to 0.35–0.65
-before settling to a mutation–selection balance (~13% perfect replicators, ~84%
-carrying the copy machinery). `zero_frac` (mean fraction of zero bytes — a
-heat-death indicator) first climbs to ~0.36 as stack writes zero memory, then
-**collapses exactly at the transition** as replicators fill memory with non-zero
-copies. Replication is confirmed not by byte-signatures alone — which *overcount*
-(sparse `01 C5` bytes appear in low-complexity tapes) — but by a **recursive
-functional test**: the offspring, placed against a fresh non-zero partner, must
-itself reproduce. This rejects the trivial all-NOP zero tape that byte-signatures
-would miss. The same emergence occurs at the **full 2¹⁹-program 32-niche grid**
-(`trepl`→0.70 by epoch 400, all niches).
+### Self-replication emerges de novo
 
-### 2. Replicator architecture turns over: Load-Push → LDIR (Fig 2)
-The dominant replicator *architecture changes over time*, exactly as the paper
-reports (Fig 2D). Byte-signature counts on the evolved populations:
+Self-replication appears as a sharp phase transition: from random bytes, replicators arise and sweep the grid. Across three seeds of a single niche the transition happens at varying epochs, roughly between 150 and 2,500, with the true-replicator fraction peaking between 0.35 and 0.65 before settling into a mutation–selection balance in which about 13% are perfect replicators and about 84% still carry the copy machinery. The mean fraction of zero bytes, which I track as a heat-death indicator, first climbs to about 0.36 (stack writes tend to zero memory) and then collapses at the transition, as replicators fill memory with non-zero copies. I do not count replicators by byte-signature alone, since those signatures overcount (short sequences such as `01 C5` occur by chance in low-complexity tapes); instead I use a recursive functional test, in which the offspring, placed against a fresh non-zero partner, must itself reproduce. This rejects, for example, the trivial all-`NOP` zero tape that a signature search would wrongly accept. The same emergence is seen at the full `2^19`-program grid, where the true-replicator fraction reaches about 0.70 by epoch 400 across all niches.
 
-| run | LDIR-family | Load-Push |
+### The replicator architecture turns over: Load-Push, then LDIR
+
+The dominant replicator architecture changes over time, as the paper reports (Fig. 2D). Counting byte-signatures on the evolved populations:
+
+| run | LDIR family | Load-Push |
 |-----|:-----------:|:---------:|
-| early / short single niche (≤12k epochs) | 0% | ~83% |
-| full 32-niche grid after 100k epochs (§0) | **99.3%** | 0.03% |
+| early, short single niche (≤ 12k epochs) | 0% | ~83% |
+| full 32-niche grid after 100k epochs | 99.3% | 0.03% |
 
-**Load-Push appears first.** In short runs the dominant replicator is
-`LD BC,$01C5 ; PUSH BC ; …` repeated — the exact Load-Push mechanism the paper
-calls *first to appear*: load two program bytes into a register, push them onto
-the stack (which grows down into the partner's half), copying the program. It
-uses the **entire 32-byte tape**.
+Load-Push appears first. In short runs the dominant replicator is `LD BC,$01C5 ; PUSH BC` repeated, which is the mechanism the paper identifies as the first to appear: it loads two program bytes into a register and pushes them onto the stack, which grows down into the partner's half, thereby copying the program. It uses the entire 32-byte tape.
 
-**LDIR takes over once function co-evolves.** In the 100k full-grid run — where
-task-solving emerged — Load-Push is essentially gone and 99.3% of tapes carry an
-LDIR-family copy loop. Every dominant genotype is a **bounded LDIR replicator with
-task code appended**, e.g. the disassembled winner from niche 0 (task `n`):
+LDIR takes over once function co-evolves. In the 100k full-grid run, where task-solving emerged, Load-Push is essentially gone and 99.3% of tapes carry an LDIR-family copy loop. Every dominant genotype is a bounded LDIR replicator with task code appended, for instance the disassembled winner from niche 0 (whose task is `n`):
+
 ```
 LD E,$20 ; LD C,E ; LDIR ; … compute … ; LD E,<result> ; HALT
 ```
-`LD E,$20` points the copy at byte 32 (the partner half), `LD C,E` sets the count
-to 32, `LDIR` copies the 32-byte tape — precisely the LDIR replicator of Fig 2B
-(`HL=0, DE=32, BC=32`). The decisive point is that this whole copy machine is only
-~6 bytes, so **the rest of the tape is free for the polynomial-solving code**.
-A Load-Push replicator consumes the *whole* tape and leaves no room to also
-compute `f(x)`; so once solving became advantageous (the `p_succ` gate), the
-compact LDIR architecture that can do *both* out-competed it. This is the paper's
-"pressure to solve tasks reshapes the reproductive machinery": function does not
-just ride on top of replication — it changes *which* replicator wins.
 
-![Spatial structure of the soup (paper Fig 1E analogue), each program coloured by its prolog bytes. Top: initial random bytes — rainbow speckle. Bottom: after 6000 epochs — Load-Push replicator lineages (prolog `01 C5` → green) dominate every niche, with black patches (low-complexity tapes) and coloured speckle (mutants).](results/fig_grid.png)
+Here `LD E,$20` points the copy at byte 32 (the partner half), `LD C,E` sets the count to 32, and `LDIR` copies the tape, which is exactly the LDIR replicator of Fig. 2B (`HL = 0`, `DE = 32`, `BC = 32`). The reason this architecture wins is that the copy loop takes only about six bytes and leaves the rest of the tape free for the code that computes `f(x)`, whereas a Load-Push replicator consumes the whole tape and has no room for a solver. Once solving becomes advantageous through the `p_succ` gate, the compact architecture that can do both displaces the one that cannot. In the paper's terms, the pressure to solve tasks reshapes the reproductive machinery: function does not simply sit on top of replication, it changes which replicator wins.
 
-### 3. Competence-gating selects task-solvers
-De novo assembly of a *solver* is essentially unreachable at reduced scale:
-validation is all-or-nothing (E must exactly equal `f(x)` on 3 inputs), so
-partial solvers get no fitness gradient. To demonstrate the **selection**
-mechanism directly, the soup is seeded with a matched pair of genotypes that use
-the *same* bounded-LDIR copy mechanism and differ only in whether they solve:
-- solver+replicator (13 bytes): `LD A,D; ADD A,A; INC A; LD BC,32; LD DE,32;
-  LDIR; LD E,A; HALT` — validates `2n+1` on all 16 inputs **and** self-copies.
-- non-solving dud: identical but the compute bytes NOP-ed.
+![Spatial structure of the soup, with each program coloured by its first bytes. Top: the initial random population, appearing as coloured noise. Bottom: after 6,000 epochs, Load-Push lineages (whose prolog `01 C5` maps to green) dominate every niche, interspersed with darker low-complexity tapes and coloured mutants.](results/fig_grid.png)
 
-Seeded at ~0.3% each, the **solver+replicator fixes at ~98% of the grid within
-~400 epochs**, outcompeting both the dud and the de novo background — because
-solving grants `p_succ=1.0` vs `p_base=0.3` (~3× interaction advantage). This is
-the paper's core co-evolutionary claim: "a program that solves its task is far
-more likely to be selected for interaction than one that does not."
+### Competence-gating selects task-solvers
 
-### 4. Metabolic / halting dynamics (Fig 3)
-As the early-halting solver+replicator dominates, mean execution length `k` drops
-from ~473 to ~34 steps — programs evolve to `HALT` as soon as the output is
-ready, exactly the metabolic-efficiency behaviour the paper reports.
+Assembling a solver de novo is very unlikely at reduced scale, because validation is all-or-nothing (the output must exactly equal `f(x)` on the sampled inputs) and so a partial solver receives no fitness gradient. To exhibit the selection mechanism on its own, I seed the soup with two matched genotypes that share the same bounded-LDIR copy loop and differ only in whether they solve: a solver-plus-replicator (`LD A,D; ADD A,A; INC A; LD BC,32; LD DE,32; LDIR; LD E,A; HALT`, which validates `2n+1` on all 16 inputs and also self-copies) and a non-solving control that is identical but with the arithmetic instructions replaced by `NOP`s. Seeded at about 0.3% each, the solver-plus-replicator fixes at about 98% of the grid within roughly 400 epochs, outcompeting both the control and the de novo background, because solving grants `p_succ = 1.0` against `p_base = 0.3`, roughly a threefold advantage in interaction rate. This is the paper's central co-evolutionary claim, that a program that solves its task is far more likely to be selected than one that does not.
 
-![Reduced-scale dynamics (one 128×128 niche unless noted). (A) Spontaneous self-replication across 3 seeds, with the phase transition at stochastically varying epochs and the signature metric overcounting relative to the recursive true-replicator test. (B) Competence-gating fixes seeded task-solvers at ~98%. (C) Tape entropy climbs (heat-death pressure) then collapses as replicators fill memory. (D) Metabolic execution length shortens as early-halting solvers dominate.](results/fig_final.png)
+### Metabolic and halting dynamics
 
-## Scope
-- **Scale.** Full de novo co-emergence of *both* replication and task-solving is
-  reproduced at the paper's grid size (2¹⁹ programs, 32 niches, CNP) in a 100k-epoch
-  run (§0). The paper runs 10⁶ epochs × 100 seeds; here a single 100k-epoch seed
-  reached 27/32 niches solved. The 5 cubic tasks did not solve — matching the
-  paper's finding that the hardest polynomials need more compute / curriculum.
-- **Selection fraction** settles at ~0.78 (vs the paper's ~0.56); the greedy
-  single-proposal matching on a 4-regular torus pairs more aggressively. Affects
-  dynamics speed, not the qualitative result.
-- **Validation writeback.** Following Algorithm 1's pseudocode, validation is
-  read-only (only interaction writes tapes back); the prose mentions validation
-  self-modification persisting, which is not modelled here.
-- **The 32 polynomials** are reconstructed from Fig 5's axis labels (the paper
-  gives no explicit table); the exact harder polynomials do not affect
-  replication emergence.
+As the early-halting solver-plus-replicator comes to dominate, the mean execution length falls from about 473 to about 34 steps, because the programs evolve to `HALT` as soon as the output is ready. This is the metabolic efficiency the paper reports (Fig. 3).
 
-## Running
+![Reduced-scale dynamics on a single 128×128 niche. (A) Spontaneous self-replication across three seeds, showing the signature count overstating replication relative to the recursive functional test. (B) Competence-gating fixing seeded task-solvers near 98%. (C) Tape entropy rising under heat-death pressure and then collapsing as replicators fill memory. (D) Execution length shortening as early-halting solvers dominate.](results/fig_final.png)
+
+## Scope and deviations
+
+Two remarks on how faithful this is, and where it falls short of the paper.
+
+The combined de novo emergence of both replication and task-solving is reproduced at the paper's grid size (`2^19` programs, 32 niches, cross-niche pollination) in a single 100k-epoch run, which reached 27 of 32 niches solved. The paper runs 10^6 epochs across 100 seeds, so this is one seed at a tenth of the epoch budget; the five cubic tasks were not solved here, consistent with the paper's observation that the hardest polynomials need more compute or a deeper curriculum.
+
+Three smaller differences are worth noting. The fraction of the grid selected each epoch settles around 0.78 rather than the paper's 0.56, because the single-proposal matching on a 4-regular torus pairs more aggressively; this affects the speed of the dynamics but not the qualitative outcome. Validation is read-only, following the pseudocode, so only interaction writes tapes back; the prose mentions validation self-modification persisting, which I do not model. Finally, the 32 polynomials are reconstructed from the axis labels of Fig. 5, since the paper gives no explicit list, but the exact choice of the harder targets does not affect the emergence of replication.
+
+## Reproducing the results
+
 ```bash
 LIBOMP=/opt/homebrew/opt/libomp   # macOS; on Linux use plain -fopenmp
 clang -O3 -march=native -Xpreprocessor -fopenmp -I$LIBOMP/include \
       -L$LIBOMP/lib -lomp -o build/soup src/soup.c
 clang -O3 -march=native -o build/analyze src/analyze.c
 
-# de novo self-replication in one niche (task 10 = 2n+1), 3 seeds
+# self-replication in one niche (task 10 = 2n+1), three seeds
 for s in 1 2 3; do
   ./build/soup --niches 1 --w 128 --h 128 --epochs 5000 --task 10 --C 0.3 \
                --log 25 --seed $s --out results/denovo_s$s.csv
 done
 ./build/soup --niches 1 --w 128 --h 128 --epochs 12000 --task 10 --C 0.3 \
              --log 200 --seed 1 --dump results/denovo.bin --out /tmp/d.csv
-./build/analyze results/denovo.bin 10          # verify + disassemble evolved replicators
+./build/analyze results/denovo.bin 10          # verify and disassemble evolved replicators
 
-# competence-gating: seeded solvers vs matched non-solving replicators
+# competence-gating: seeded solvers against matched non-solving controls
 ./build/soup --niches 1 --w 128 --h 128 --epochs 8000 --task 10 --C 0.3 \
              --plant_solver 50 --plant_dud 50 --log 20 --seed 5 --out results/compete_fine.csv
 
-# reduced-scale dynamics figure (results/fig_final.png)
+# reduced-scale dynamics figure
 python3 plot_final.py results/fig_final.png \
         results/denovo_s1.csv results/denovo_s2.csv results/denovo_s3.csv results/compete_fine.csv
 
-# full paper-scale grid: 32 niches x 128x128 = 2^19 programs, cross-niche pollination
+# full grid: 32 niches x 128x128 = 2^19 programs, with cross-niche pollination
 ./build/soup --niches 32 --w 128 --h 128 --epochs 100000 --C 0.3 --pi 0.05 \
              --log 500 --seed 1 --out results/grid32_1e5.csv --dump results/grid32_1e5.bin
 clang -O3 -march=native -o build/grid_analyze src/grid_analyze.c
-./build/grid_analyze results/grid32_1e5.bin    # per-niche solve% + which tasks solved
-python3 viz_grid.py results/grid32_1e5.bin 128 128 results/fig_grid_after.png 4
+./build/grid_analyze results/grid32_1e5.bin    # per-niche solve rates
 ```
 
-CLI flags: `--niches --w --h --epochs --task --C --pi --seed --log --budget`,
-plus experiment switches `--notasks` (Fig 2D control, skip validation),
-`--plant_solver K` / `--plant_dud K` (competence-gating demo), `--dump FILE`.
+The main command-line flags are `--niches`, `--w`, `--h`, `--epochs`, `--task`, `--C`, `--pi`, `--seed`, `--log`, and `--budget`, together with `--notasks` (the Fig. 2D control, which skips validation), `--plant_solver K` and `--plant_dud K` (the competence-gating experiment), `--dump FILE`, and `--anim` with `--animout FILE` (the animation frames).
