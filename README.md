@@ -14,6 +14,8 @@ Following the paper (Section 2.2, Fig. 1E), the population consists of 32-byte Z
 
 Reproduction is never issued as a command. It happens only when the executed code copies one program's bytes over the other's memory, so a program that both copies itself and solves its task is the one selected most often. The point of the experiment is that neither ability is provided in advance; both have to be discovered by the population.
 
+> **Companion experiment: a different CPU.** [`README_6502.md`](README_6502.md) reruns the same model on the **MOS 6502** to ask whether the spontaneous *origin* of replication is substrate-general. Lacking the Z80's one-instruction block move `LDIR`, the 6502 forms a replicator ~100× more rarely from random code; on a single niche it never originates one even in the paper's 10⁶-epoch budget, but on the **full 32-niche grid** (2¹⁹ programs) it does: replication ignites de novo around epoch 61k, sweeps to 91%, and task-solving then co-evolves across 16 of 32 niches, exactly as on the Z80, just far later and slower.
+
 ## Repository
 
 | file | purpose |
@@ -26,7 +28,7 @@ Reproduction is never issued as a command. It happens only when the executed cod
 | `src/grid_analyze.c` | per-niche solve rates for the 32-niche grid |
 | `src/disasm.h` | small Z80 disassembler, used to read evolved replicators |
 | `src/difftest.c` | differential test of `z80fast.h` against chips over 3M tapes |
-| `plot_final.py`, `viz_grid.py`, `make_gif.py` | figures and the animation |
+| `plot.py`, `viz_grid.py`, `make_gif.py` | figures (`dynamics`/`final`/`6502` modes) and the animation |
 
 ### The Z80 sandbox
 
@@ -93,6 +95,12 @@ As the early-halting solver-plus-replicator comes to dominate, the mean executio
 
 ![Reduced-scale dynamics on a single 128×128 niche. (A) Spontaneous self-replication across three seeds, showing the signature count overstating replication relative to the recursive functional test. (B) Competence-gating fixing seeded task-solvers near 98%. (C) Tape entropy rising under heat-death pressure and then collapsing as replicators fill memory. (D) Execution length shortening as early-halting solvers dominate.](results/fig_final.png)
 
+### A different CPU: the MOS 6502
+
+As a companion experiment (see [`README_6502.md`](README_6502.md)), I reran the identical model on the MOS 6502, the other CPU core in floooh/chips, to ask whether the spontaneous origin of replication is a general property of these soups or specific to the Z80. It turns out to be specific, and the difference is one of scale. The 6502 has no single-instruction block move like `LDIR`, so a replicator must be a copy loop plus an explicit halt; this makes it about 100× rarer to assemble from random bytes (114× for functional self-copiers and 62× for true replicators, measured over 500M tapes per CPU) and about six times less robust to mutation. A single niche therefore never originates a replicator even in the paper's 10⁶-epoch budget, whereas the Z80 does so within a few hundred epochs. On the full 32-niche grid, however, the larger search suffices: replication ignites de novo around epoch 61,000, sweeps to 91%, and task-solving then co-evolves across 16 of the 32 niches, exactly as on the Z80 — only later, slower, and without the metabolic shortening a compact `LDIR` replicator permits, since the 6502's copy loop keeps execution long throughout.
+
+![MOS 6502 vs Z80. (A) Spontaneous replicators are ~100× rarer in random 6502 code. (B) De novo emergence is scale-dependent: fast on a Z80 niche, absent on a 6502 niche over 10⁶ epochs, but present on the full 6502 grid at epoch ~61k. (C) The 6502 loop-replicator is less mutationally robust. (D) Competence-gating still selects task-solvers. (E) On the grid, replication and then task-solving co-evolve, the curriculum reaching 16/32 niches. (F) The Z80 evolves short early-halting solvers; the 6502 cannot, because copying is a long loop.](results/fig_6502.png)
+
 ## Scope and deviations
 
 Two remarks on how faithful this is, and where it falls short of the paper.
@@ -123,7 +131,7 @@ done
              --plant_solver 50 --plant_dud 50 --log 20 --seed 5 --out results/compete_fine.csv
 
 # reduced-scale dynamics figure
-python3 plot_final.py results/fig_final.png \
+python3 plot.py final results/fig_final.png \
         results/denovo_s1.csv results/denovo_s2.csv results/denovo_s3.csv results/compete_fine.csv
 
 # full grid: 32 niches x 128x128 = 2^19 programs, with cross-niche pollination

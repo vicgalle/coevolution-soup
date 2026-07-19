@@ -4,6 +4,9 @@ build/
 *.out
 a.out
 
+*.tex
+*.pdf
+
 # large, regenerable population dumps (16 MB+ each)
 results/*.bin
 
