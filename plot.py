@@ -198,7 +198,7 @@ def mode_6502(argv):
         a.plot(e, [n/32 for n in g["niches_solved"]], color=purple, lw=2, ls="--", label="niches solved / 32")
     a.set_xlabel("epoch (×1000)"); a.set_ylabel("fraction")
     a.set_title("(E) 6502 full grid: replication then task-solving\nco-evolve; curriculum spreads to 16/32 niches")
-    a.set_ylim(-.02, 1.02); a.legend(fontsize=8, loc="center right"); a.grid(alpha=.3)
+    a.set_ylim(-.02, 1.02); a.legend(fontsize=8, loc="upper left"); a.grid(alpha=.3)
 
     # F: metabolic dynamics — 6502 can't early-halt (linear epoch axis)
     a = ax[1][2]
