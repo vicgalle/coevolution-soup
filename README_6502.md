@@ -7,20 +7,20 @@ self-replication emerges spontaneously from random **Z80** programs, and that
 problem-solving co-evolves alongside it. A natural question is whether this
 emergence is a general property of such digital soups or an artifact of the
 particular instruction set. To address it, we rerun the identical model on the
-**MOS 6502** — the other CPU core in floooh/chips — and compare the two
+**MOS 6502** (the other CPU core in floooh/chips) and compare the two
 substrates under the same parameters.
 
 We find that the *origin* of replication is strongly substrate-dependent, and
 that the dependence is one of **scale** rather than of possibility. The Z80 owes
 its result to two copy primitives that are cheap to assemble by chance: the
 single-instruction block move `LDIR`, and one-byte stack pushes. The 6502 has
-neither — it has no block move, and its stack route yields dead *reversed* copies
-unless the source is read backwards — so a 6502 replicator must be a coordinated
+neither: it has no block move, and its stack route yields dead *reversed* copies
+unless the source is read backwards, so a 6502 replicator must be a coordinated
 copy loop together with an explicit halt. In consequence, a replicator is roughly
 two orders of magnitude rarer to assemble from noise and markedly more fragile
 under mutation: a single niche never originates one within the paper's 10⁶-epoch
 budget, whereas the Z80 does so within a few hundred epochs. On the full 32-niche
-grid, however, the larger search suffices — replication ignites de novo around
+grid, however, the larger search suffices: replication ignites de novo around
 epoch 61,000, sweeps the population, and task-solving then co-evolves across the
 niches, exactly as on the Z80.
 
@@ -55,7 +55,7 @@ must carry an explicit halt to protect its fresh copy.
 **1. Spontaneous replication is ~100× rarer.** Over 500M random tapes per CPU
 (`build/density`), functional self-copiers occur at 9.1×10⁻⁷ on the Z80 against
 8.0×10⁻⁹ on the 6502, and true (recursively reproducing) replicators at 3.7×10⁻⁷
-against 6.0×10⁻⁹ — gaps of 114× and 62×. This is the mechanistic root of
+against 6.0×10⁻⁹ (gaps of 114× and 62×). This is the mechanistic root of
 everything below.
 
 **2. De novo emergence is a matter of scale.** From random bytes, a single Z80
@@ -69,7 +69,7 @@ is about what the density gap of finding 1 demands.
 **3. The loop-replicator is less mutationally robust.** Following the paper's
 Fig. 2F, we mutate a canonical replicator *k* times and test whether it still
 copies (`build/robust`). The 6502 survives less often at every *k*, and by *k*=8
-only 3.4% remain functional against the Z80's 19.6% — the price of a larger
+only 3.4% remain functional against the Z80's 19.6%, the price of a larger
 machinery (loop plus halt).
 
 **4. Selection and co-evolution operate normally once replication exists.** Seeded
@@ -103,7 +103,7 @@ fixes the *difficulty of the origin itself*. With a compact copy primitive,
 replication is almost free to discover; without one it is rare enough that whether
 it is observed at all depends on the scale of the search available. Origin claims
 in these digital soups are therefore not substrate facts but substrate-and-scale
-facts — a reading in which reported emergence times should be interpreted together
+facts, a reading in which reported emergence times should be interpreted together
 with both the instruction set and the population size. This sharpens the paper's
 thesis rather than contradicting it.
 
@@ -122,7 +122,7 @@ clang -O2 -o build/test_genotype6502 src/test_genotype6502.c
 ./build/density 500000000 12345                # finding 1: replicator density (~3 min)
 ./build/robust  300000                         # finding 3: mutational robustness
 
-# finding 2: de novo emergence — never on one niche, but yes on the full grid
+# finding 2: de novo emergence, absent on one niche but present on the full grid
 ./build/soup6502 --niches 1  --w 128 --h 128 --epochs 1000000 --notasks --seed 1 \
     --log 2000 --out results/denovo6502_notasks_s1.csv
 ./build/soup6502 --niches 32 --w 128 --h 128 --epochs 140000  --C 0.3 --pi 0.05 --seed 1 \
